@@ -7,6 +7,8 @@ out vec2 v_texcoord;
 
 uniform vec4 u_translation;
 uniform float u_rotation;
+uniform float u_scale;
+uniform vec2 u_shear;
 
 mat4 rotationMatrix() {
   float s = sin(u_rotation);
@@ -18,8 +20,15 @@ mat4 rotationMatrix() {
               0.0, 0.0, 0.0, 1.0);
 }
 
+mat4 shearMatrix() {
+  return mat4(      1.0, u_shear.y, 0.0, 0.0,
+              u_shear.x,       1.0, 0.0, 0.0,
+                    1.0,       1.0, 1.0, 1.0,
+                    0.0,       0.0, 0.0, 1.0);
+}
+
 void main() {
-  gl_Position = rotationMatrix() * a_position + u_translation;
+  gl_Position = shearMatrix()*(rotationMatrix()*a_position) + u_translation;
   v_texcoord = a_texcoord;
 }`;
 
@@ -65,7 +74,7 @@ function loadProgram(gl) {
 function main() {
 
   var canvas = document.getElementById("canvas");
-  var gl = canvas.getContext( 'webgl2', { antialias: false } );
+  var gl = canvas.getContext("webgl2");
 
   if (!gl) {
     return;
@@ -80,6 +89,8 @@ function main() {
   var textureLocation = gl.getUniformLocation(program, "u_texture");
   var translationLocation = gl.getUniformLocation(program, "u_translation");
   var rotationLocation = gl.getUniformLocation(program, "u_rotation");
+  var scaleLocation = gl.getUniformLocation(program, "u_scale");
+  var shearLocation = gl.getUniformLocation(program, "u_shear");
 
   var vao = gl.createVertexArray();
 
@@ -125,7 +136,7 @@ function main() {
                   new Uint8Array([0, 0, 255, 255]));
 
     var img = new Image();
-    img.addEventListener('load', function() {
+    img.addEventListener("load", function() {
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
       gl.generateMipmap(gl.TEXTURE_2D);
@@ -135,7 +146,7 @@ function main() {
     return tex;
   }
 
-  var image = loadTexture('blaine.png');
+  var image = loadTexture("blaine.png");
 
   function draw() {
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -150,6 +161,8 @@ function main() {
     // Apply transformations to source
     gl.uniform4f(translationLocation, translation.x, translation.y, 0.0, 0.0);
     gl.uniform1f(rotationLocation, rotation);
+    gl.uniform1f(scaleLocation, scale);
+    gl.uniform2f(shearLocation, shear.x, shear.y);
 
 
 
@@ -177,37 +190,20 @@ function main() {
 
 
 function updateTransformations() {
+  getPressedKeyBindings().forEach(action => action.execute());
+}
 
-  // If shift modifier
-  if (keys[16]) {
-    if (keys[37] || keys[65]) { // ArrowLeft, A
-      rotation -= ROTATION_STEP;
-    }
-    if (keys[39] || keys[68]) { // ArrowRight, D
-      rotation += ROTATION_STEP;
-    }
-  }
-  else {
-    // Translation keys
-    if (keys[37] || keys[65]) { // ArrowLeft, A
-      translation.x -= TRANSLATION_STEP;
-    }
-    if (keys[38] || keys[87]) { // ArrowUp, W
-      translation.y += TRANSLATION_STEP;
-    }
-    if (keys[39] || keys[68]) { // ArrowRight, D
-      translation.x += TRANSLATION_STEP;
-    }
-    if (keys[40] || keys[83]) { // ArrowDown, S
-      translation.y -= TRANSLATION_STEP;
-    }
-  }
-
+function getPressedKeyBindings() {
+  return keyBindings.filter(action =>
+    action.keys.some(binding =>
+      binding.length ? binding.every(key => keys[key]) : keys[binding])
+    );
 }
 
 
 const TRANSLATION_STEP = 0.015;
-const ROTATION_STEP = 0.015;
+const ROTATION_STEP = 0.0175;
+const SHEAR_STEP = 0.015;
 
 var keys = {}; // Object of all keys currently pressed
 
@@ -217,10 +213,53 @@ var translation = {
   y: 0
 };
 var rotation = Math.PI;
+var scale = 2.0;
+var shear = {
+  x: 0,
+  y: 0
+};
+
+var keyBindings = [
+  { // Translate negative x
+    keys: [37, 65], // ArrowLeft || A
+    execute: () => translation.x -= TRANSLATION_STEP
+  }, { // Translate positive y
+    keys: [38, 87], // ArrowUp || W
+    execute: () => translation.y += TRANSLATION_STEP
+  }, { // Translate positive x
+    keys: [39, 68], // ArrowRight || D
+    execute: () => translation.x += TRANSLATION_STEP
+  }, { // Translate positive x
+    keys: [40, 83], // ArrowDown || S
+    execute: () => translation.y -= TRANSLATION_STEP
+  }, { // Rotation negative
+    keys: [81, [16, 37], [16, 65]], // Q || (Shift && (ArrowLeft || A))
+    execute: () => rotation -= ROTATION_STEP
+  }, { // Rotation positive
+    keys: [69, [16, 39], [16, 68]], // E || (Shift && (ArrowRight || D))
+    execute: () => rotation += ROTATION_STEP
+  }, { // Shear positive x
+    keys: [[17, 37], [17, 65]], // Ctrl && (ArrowLeft || A)
+    execute: () => shear.x += SHEAR_STEP
+  }, { // Shear negative y
+    keys: [[17, 38], [17, 87]], // Ctrl && (ArrowUp || W)
+    execute: () => shear.y -= SHEAR_STEP
+  }, { // Shear negative x
+    keys: [[17, 39], [17, 68]], // Ctrl && (ArrowRight || D)
+    execute: () => shear.x -= SHEAR_STEP
+  }, { // Shear positive y
+    keys: [[17, 40], [17, 83]], // Ctrl && (ArrowDown || S)
+    execute: () => shear.y += SHEAR_STEP
+  }
+]
 
 // Add window event listeners to save keypresses
 window.addEventListener("keydown", function(e) {
   keys[e.which] = true;
+
+  // If we are executing an action, prevent default browser behavior
+  if (getPressedKeyBindings().length)
+    e.preventDefault();
 });
 window.addEventListener("keyup", function(e) {
   delete keys[e.which];
