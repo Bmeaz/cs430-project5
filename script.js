@@ -10,25 +10,23 @@ uniform float u_rotation;
 uniform float u_scale;
 uniform vec2 u_shear;
 
-mat4 rotationMatrix() {
-  float s = sin(u_rotation);
-  float c = cos(u_rotation);
-
-  return mat4(c,    -s, 0.0, 0.0,
-              s,     c, 0.0, 0.0,
-              1.0, 1.0, 1.0, 1.0,
-              0.0, 0.0, 0.0, 1.0);
-}
-
-mat4 shearMatrix() {
-  return mat4(      1.0, u_shear.y, 0.0, 0.0,
-              u_shear.x,       1.0, 0.0, 0.0,
-                    1.0,       1.0, 1.0, 1.0,
-                    0.0,       0.0, 0.0, 1.0);
-}
-
 void main() {
-  gl_Position = shearMatrix()*(rotationMatrix()*a_position) + u_translation;
+  float r_sin = sin(u_rotation);
+  float r_cos = cos(u_rotation);
+
+  mat4 rotationMatrix = mat4(r_cos, -r_sin, 0.0, 0.0,
+                             r_sin,  r_cos, 0.0, 0.0,
+                             1.0,      1.0, 1.0, 1.0,
+                             0.0,      0.0, 0.0, 1.0);
+
+  mat4 shearMatrix = mat4(      1.0, u_shear.y, 0.0, 0.0,
+                          u_shear.x,       1.0, 0.0, 0.0,
+                                1.0,       1.0, 1.0, 1.0,
+                                0.0,       0.0, 0.0, 1.0);
+
+  vec4 scaleVector = vec4(u_scale, u_scale, 1.0, 1.0);
+
+  gl_Position = shearMatrix * (rotationMatrix * (a_position * scaleVector)) + u_translation;
   v_texcoord = a_texcoord;
 }`;
 
@@ -51,7 +49,6 @@ function loadShader(gl, shaderSource, shaderType) {
   var shader = gl.createShader(shaderType);
 
   gl.shaderSource(shader, shaderSource);
-
   gl.compileShader(shader);
 
   return shader;
@@ -156,6 +153,9 @@ function main() {
 
     gl.useProgram(program);
 
+    gl.bindVertexArray(vao);
+
+    gl.uniform1i(textureLocation, 0);
 
 
     // Apply transformations to source
@@ -164,12 +164,6 @@ function main() {
     gl.uniform1f(scaleLocation, scale);
     gl.uniform2f(shearLocation, shear.x, shear.y);
 
-
-
-
-    gl.bindVertexArray(vao);
-
-    gl.uniform1i(textureLocation, 0);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, image);
@@ -204,19 +198,20 @@ function getPressedKeyBindings() {
 const TRANSLATION_STEP = 0.015;
 const ROTATION_STEP = 0.0175;
 const SHEAR_STEP = 0.015;
+const SCALE_STEP = 0.015;
 
 var keys = {}; // Object of all keys currently pressed
 
 // Transformation tracking variables
 var translation = {
-  x: 0,
-  y: 0
+  x: 0.0,
+  y: 0.0
 };
 var rotation = Math.PI;
-var scale = 2.0;
+var scale = 1.0;
 var shear = {
-  x: 0,
-  y: 0
+  x: 0.0,
+  y: 0.0
 };
 
 var keyBindings = [
@@ -233,23 +228,29 @@ var keyBindings = [
     keys: [40, 83], // ArrowDown || S
     execute: () => translation.y -= TRANSLATION_STEP
   }, { // Rotation negative
-    keys: [81, [16, 37], [16, 65]], // Q || (Shift && (ArrowLeft || A))
+    keys: [81, 85], // Q || U
     execute: () => rotation -= ROTATION_STEP
   }, { // Rotation positive
-    keys: [69, [16, 39], [16, 68]], // E || (Shift && (ArrowRight || D))
+    keys: [69, 79], // E || O
     execute: () => rotation += ROTATION_STEP
   }, { // Shear positive x
-    keys: [[17, 37], [17, 65]], // Ctrl && (ArrowLeft || A)
+    keys: [74, 100], // J || Numpad 4
     execute: () => shear.x += SHEAR_STEP
   }, { // Shear negative y
-    keys: [[17, 38], [17, 87]], // Ctrl && (ArrowUp || W)
+    keys: [73, 104], // I || Numpad 8
     execute: () => shear.y -= SHEAR_STEP
   }, { // Shear negative x
-    keys: [[17, 39], [17, 68]], // Ctrl && (ArrowRight || D)
+    keys: [76, 102], // L || Numpad 6
     execute: () => shear.x -= SHEAR_STEP
   }, { // Shear positive y
-    keys: [[17, 40], [17, 83]], // Ctrl && (ArrowDown || S)
+    keys: [75, 98], // K || Numpad 2
     execute: () => shear.y += SHEAR_STEP
+  }, { // Scale up
+    keys: [82, 80], // R || P
+    execute: () => scale += SCALE_STEP
+  }, { // Scale Down
+    keys: [70, 186], // F || ;
+    execute: () => scale -= SCALE_STEP
   }
 ]
 
