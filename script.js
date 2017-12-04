@@ -1,11 +1,12 @@
 const vertexShaderSource = `#version 300 es
 
-in vec4 a_position;
+in vec2 a_position;
 in vec2 a_texcoord;
 
 out vec2 v_texcoord;
 
-uniform vec4 u_translation;
+uniform vec2 u_resolution;
+uniform vec2 u_translation;
 uniform float u_rotation;
 uniform float u_scale;
 uniform vec2 u_shear;
@@ -14,19 +15,17 @@ void main() {
   float r_sin = sin(u_rotation);
   float r_cos = cos(u_rotation);
 
-  mat4 rotationMatrix = mat4(r_cos, -r_sin, 0.0, 0.0,
-                             r_sin,  r_cos, 0.0, 0.0,
-                             1.0,      1.0, 1.0, 1.0,
-                             0.0,      0.0, 0.0, 1.0);
+  // Create transformation matrices
+  mat2 rotationMatrix = mat2(r_cos, -r_sin,
+                             r_sin,  r_cos);
 
-  mat4 shearMatrix = mat4(      1.0, u_shear.y, 0.0, 0.0,
-                          u_shear.x,       1.0, 0.0, 0.0,
-                                1.0,       1.0, 1.0, 1.0,
-                                0.0,       0.0, 0.0, 1.0);
+  mat2 shearMatrix = mat2(        1, u_shear.y,
+                          u_shear.x,         1);
 
-  vec4 scaleVector = vec4(u_scale, u_scale, 1.0, 1.0);
+  // Calculate the effect of the transformations
+  vec2 position = shearMatrix * (rotationMatrix * (a_position * u_scale)) + u_translation;
 
-  gl_Position = shearMatrix * (rotationMatrix * (a_position * scaleVector)) + u_translation;
+  gl_Position = vec4(position.x / (u_resolution.x / u_resolution.y), position.y, 0, 1);
   v_texcoord = a_texcoord;
 }`;
 
@@ -57,11 +56,11 @@ function loadShader(gl, shaderSource, shaderType) {
 function loadProgram(gl) {
   var program = gl.createProgram();
 
-  var shader = loadShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
+  var shader = loadShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
   gl.attachShader(program, shader);
 
-  shader = loadShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
-  gl.attachShader(program, shader);
+  shader = loadShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
+  gl.attachShader(program, shader);  
 
   gl.linkProgram(program);
 
@@ -83,6 +82,7 @@ function main() {
   var texcoordLocation = gl.getAttribLocation(program, "a_texcoord");
 
   // Get uniforms
+  var resolutionLocation = gl.getUniformLocation(program, "u_resolution");
   var textureLocation = gl.getUniformLocation(program, "u_texture");
   var translationLocation = gl.getUniformLocation(program, "u_translation");
   var rotationLocation = gl.getUniformLocation(program, "u_rotation");
@@ -130,7 +130,7 @@ function main() {
     var tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-                  new Uint8Array([0, 0, 255, 255]));
+                  new Uint8Array([255, 245, 157, 255]));
 
     var img = new Image();
     img.addEventListener("load", function() {
@@ -152,19 +152,19 @@ function main() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     gl.useProgram(program);
-
     gl.bindVertexArray(vao);
 
+    // Apply uniforms to source
+    gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
     gl.uniform1i(textureLocation, 0);
 
-
-    // Apply transformations to source
-    gl.uniform4f(translationLocation, translation.x, translation.y, 0.0, 0.0);
+    // Transformation uniforms
+    gl.uniform2f(translationLocation, translation.x, translation.y);
     gl.uniform1f(rotationLocation, rotation);
     gl.uniform1f(scaleLocation, scale);
     gl.uniform2f(shearLocation, shear.x, shear.y);
 
-
+    // Apply image to texture
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, image);
 
@@ -174,6 +174,7 @@ function main() {
 
   function render(time) {
     updateTransformations(); // Update transformation tracking variables
+
     draw();
 
     requestAnimationFrame(render);
@@ -204,8 +205,8 @@ var keys = {}; // Object of all keys currently pressed
 
 // Transformation tracking variables
 var translation = {
-  x: 0.0,
-  y: 0.0
+  x: 0.5,
+  y: 0.5
 };
 var rotation = Math.PI;
 var scale = 1.0;
