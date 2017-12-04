@@ -6,9 +6,20 @@ in vec2 a_texcoord;
 out vec2 v_texcoord;
 
 uniform vec4 u_translation;
+uniform float u_rotation;
+
+mat4 rotationMatrix() {
+  float s = sin(u_rotation);
+  float c = cos(u_rotation);
+
+  return mat4(c,    -s, 0.0, 0.0,
+              s,     c, 0.0, 0.0,
+              1.0, 1.0, 1.0, 1.0,
+              0.0, 0.0, 0.0, 1.0);
+}
 
 void main() {
-  gl_Position = a_position + u_translation;
+  gl_Position = rotationMatrix() * a_position + u_translation;
   v_texcoord = a_texcoord;
 }`;
 
@@ -64,8 +75,11 @@ function main() {
 
   var positionLocation = gl.getAttribLocation(program, "a_position");
   var texcoordLocation = gl.getAttribLocation(program, "a_texcoord");
+
+  // Get uniforms
   var textureLocation = gl.getUniformLocation(program, "u_texture");
   var translationLocation = gl.getUniformLocation(program, "u_translation");
+  var rotationLocation = gl.getUniformLocation(program, "u_rotation");
 
   var vao = gl.createVertexArray();
 
@@ -121,7 +135,7 @@ function main() {
     return tex;
   }
 
-  var image = loadTexture('stone1.png');
+  var image = loadTexture('blaine.png');
 
   function draw() {
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -135,6 +149,7 @@ function main() {
 
     // Apply transformations to source
     gl.uniform4f(translationLocation, translation.x, translation.y, 0.0, 0.0);
+    gl.uniform1f(rotationLocation, rotation);
 
 
 
@@ -151,7 +166,7 @@ function main() {
   }
 
   function render(time) {
-    updateTransformations();
+    updateTransformations(); // Update transformation tracking variables
     draw();
 
     requestAnimationFrame(render);
@@ -162,36 +177,46 @@ function main() {
 
 
 function updateTransformations() {
-  // Translation keys
-  if (keys[37] || keys[65]) {
-    translation.x -= TRANSLATION_STEP;
+
+  // If shift modifier
+  if (keys[16]) {
+    if (keys[37] || keys[65]) { // ArrowLeft, A
+      rotation -= ROTATION_STEP;
+    }
+    if (keys[39] || keys[68]) { // ArrowRight, D
+      rotation += ROTATION_STEP;
+    }
   }
-  if (keys[38] || keys[87]) {
-    translation.y += TRANSLATION_STEP;
-  }
-  if (keys[39] || keys[68]) {
-    translation.x += TRANSLATION_STEP;
-  }
-  if (keys[40] || keys[83]) {
-    translation.y -= TRANSLATION_STEP;
+  else {
+    // Translation keys
+    if (keys[37] || keys[65]) { // ArrowLeft, A
+      translation.x -= TRANSLATION_STEP;
+    }
+    if (keys[38] || keys[87]) { // ArrowUp, W
+      translation.y += TRANSLATION_STEP;
+    }
+    if (keys[39] || keys[68]) { // ArrowRight, D
+      translation.x += TRANSLATION_STEP;
+    }
+    if (keys[40] || keys[83]) { // ArrowDown, S
+      translation.y -= TRANSLATION_STEP;
+    }
   }
 
 }
 
 
-
-
-
-// Transformation stuff
-const TRANSLATION_STEP = 0.01;
+const TRANSLATION_STEP = 0.015;
+const ROTATION_STEP = 0.015;
 
 var keys = {}; // Object of all keys currently pressed
 
+// Transformation tracking variables
 var translation = {
   x: 0,
   y: 0
-}
-
+};
+var rotation = Math.PI;
 
 // Add window event listeners to save keypresses
 window.addEventListener("keydown", function(e) {
