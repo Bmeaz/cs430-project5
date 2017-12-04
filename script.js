@@ -190,9 +190,7 @@ function updateTransformations() {
 
 function getPressedKeyBindings() {
   return keyBindings.filter(action =>
-    action.keys.some(binding =>
-      binding.length ? binding.every(key => keys[key]) : keys[binding])
-    );
+    action.keys.some(binding => keys[binding]));
 }
 
 
@@ -216,56 +214,74 @@ var shear = {
 };
 
 var keyBindings = [
-  { // Translate negative x
-    keys: [37, 65], // ArrowLeft || A
+  {
+    descr: "Move left",
+    keys: ["ArrowLeft", "KeyA"], // ArrowLeft || A
     execute: () => translation.x -= TRANSLATION_STEP
-  }, { // Translate positive y
-    keys: [38, 87], // ArrowUp || W
+  }, {
+    descr: "Move up",
+    keys: ["ArrowUp", "KeyW"], // ArrowUp || W
     execute: () => translation.y += TRANSLATION_STEP
-  }, { // Translate positive x
-    keys: [39, 68], // ArrowRight || D
+  }, {
+    descr: "Move right",
+    keys: ["ArrowRight", "KeyD"], // ArrowRight || D
     execute: () => translation.x += TRANSLATION_STEP
-  }, { // Translate positive x
-    keys: [40, 83], // ArrowDown || S
+  }, {
+    descr: "Move down",
+    keys: ["ArrowDown", "KeyS"], // ArrowDown || S
     execute: () => translation.y -= TRANSLATION_STEP
-  }, { // Rotation negative
-    keys: [81, 85], // Q || U
+  }, {
+    descr: "Rotate clockwise",
+    keys: ["KeyQ", "KeyU"], // Q || U
     execute: () => rotation -= ROTATION_STEP
-  }, { // Rotation positive
-    keys: [69, 79], // E || O
+  }, {
+    descr: "Rotate counter-clockwise",
+    keys: ["KeyE", "KeyO"], // E || O
     execute: () => rotation += ROTATION_STEP
-  }, { // Shear positive x
-    keys: [74, 100], // J || Numpad 4
+  }, {
+    descr: "Shear x (positive)",
+    keys: ["KeyJ", "Numpad4"], // J || Numpad 4
     execute: () => shear.x += SHEAR_STEP
-  }, { // Shear negative y
-    keys: [73, 104], // I || Numpad 8
+  }, {
+    descr: "Shear y (negative)",
+    keys: ["KeyI", "Numpad8"], // I || Numpad 8
     execute: () => shear.y -= SHEAR_STEP
-  }, { // Shear negative x
-    keys: [76, 102], // L || Numpad 6
+  }, {
+    descr: "Shear x (negative)",
+    keys: ["KeyL", "Numpad6"], // L || Numpad 6
     execute: () => shear.x -= SHEAR_STEP
-  }, { // Shear positive y
-    keys: [75, 98], // K || Numpad 2
+  }, {
+    descr: "Shear y (positive)",
+    keys: ["KeyK", "Numpad2"], // K || Numpad 2
     execute: () => shear.y += SHEAR_STEP
-  }, { // Scale up
-    keys: [82, 80], // R || P
+  }, {
+    descr: "Scale up",
+    keys: ["KeyR", "KeyP"], // R || P
     execute: () => scale += SCALE_STEP
-  }, { // Scale Down
-    keys: [70, 186], // F || ;
+  }, {
+    descr: "Scale Down",
+    keys: ["KeyF", "Semicolon"], // F || ;
     execute: () => scale -= SCALE_STEP
   }
 ]
 
 // Add window event listeners to save keypresses
 window.addEventListener("keydown", function(e) {
-  keys[e.which] = true;
+  keys[e.code] = true;
 
   // If we are executing an action, prevent default browser behavior
   if (getPressedKeyBindings().length)
     e.preventDefault();
 });
 window.addEventListener("keyup", function(e) {
-  delete keys[e.which];
+  delete keys[e.code];
 });
+
+document.getElementById("js-keyBindings").innerHTML += keyBindings.map(action => `
+    <div>
+      ${action.descr} - <b>[${action.keys.join(", ")}]</b>
+    </div>
+  `).join("");
 
 // Kick off the program
 main();
